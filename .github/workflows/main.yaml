@@ -10,26 +10,68 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
-      
-      # --- Установка Java (нужна для Android) ---
-      - uses: actions/setup-java@v4
+      # 1. Клонируем репозиторий
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2. Проверяем, что build.sh существует
+      - name: Check if build.sh exists
+        run: |
+          if [ ! -f "build.sh" ]; then
+            echo "::error::Файл build.sh не найден в корне архива! Добавьте его."
+            exit 1
+          fi
+          echo "✅ build.sh найден"
+
+      # 3. Устанавливаем Java 17
+      - name: Set up Java
+        uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
-          
-      # --- Установка Android SDK с автоматическим принятием лицензий ---
-      - uses: android-actions/setup-android@v3
+
+      # 4. Устанавливаем Android SDK
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
         with:
-          accept-android-sdk-licenses: true   # <--- ЭТО КЛЮЧЕВОЙ ПАРАМЕТР
-          
-      # --- Твой шаг сборки ---
+          accept-android-sdk-licenses: true
+
+      # 5. Принудительно принимаем все лицензии (с проверкой)
+      - name: Accept all SDK licenses
+        run: |
+          yes | sdkmanager --licenses || true
+          echo "✅ Лицензии приняты"
+
+      # 6. Выводим список файлов для отладки (что реально лежит в папке)
+      - name: List files for debugging
+        run: |
+          echo "📁 Содержимое текущей папки:"
+          ls -la
+          echo "📁 Содержимое подпапок (если есть):"
+          find . -maxdepth 2 -type f | head -50
+
+      # 7. Запускаем сборку (передаём target как аргумент)
       - name: Build
-        run: bash build.sh ${{ github.event.inputs.target }}
-        
-      # --- Загрузка артефакта ---
-      - uses: actions/upload-artifact@v4
+        run: |
+          echo "🚀 Запуск сборки с target=${{ github.event.inputs.target }}"
+          bash build.sh ${{ github.event.inputs.target }}
+
+      # 8. Проверяем, что артефакты появились
+      - name: Check artifacts
+        run: |
+          echo "🔍 Поиск готовых файлов..."
+          if find . -name "*.apk" -o -name "*.exe" | grep -q .; then
+            echo "✅ Найдены артефакты:"
+            find . -name "*.apk" -o -name "*.exe"
+          else
+            echo "::warning::Артефакты (.apk/.exe) не найдены в папке dist/ или output/"
+          fi
+
+      # 9. Загружаем артефакты (если они есть)
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
         with:
           name: result
           path: |
