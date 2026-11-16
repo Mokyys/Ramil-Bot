@@ -1,1 +1,40 @@
+name: main
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'apk or exe'
+        required: false
+        default: 'apk'
 
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      # --- Установка Java (нужна для Android) ---
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          
+      # --- Установка Android SDK с автоматическим принятием лицензий ---
+      - uses: android-actions/setup-android@v3
+        with:
+          accept-android-sdk-licenses: true   # <--- ЭТО КЛЮЧЕВОЙ ПАРАМЕТР
+          
+      # --- Твой шаг сборки ---
+      - name: Build
+        run: bash build.sh ${{ github.event.inputs.target }}
+        
+      # --- Загрузка артефакта ---
+      - uses: actions/upload-artifact@v4
+        with:
+          name: result
+          path: |
+            dist/**
+            output/**
+            *.apk
+            *.exe
+          if-no-files-found: error
